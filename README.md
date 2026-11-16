@@ -10,7 +10,7 @@
 
 > Windows 版安装、构建与差异说明见 [Windows/README.md](Windows/README.md)。
 >
-> 详细功能说明、灯态截图与故障排查见 [使用说明书](docs/使用说明书.md)。
+> 详细功能说明、灯态截图与故障排查见 [使用说明书](docs/使用说明书.md)（也可直接看 [PDF 版](docs/使用说明书.pdf)）。
 
 ## 灯语
 
