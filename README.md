@@ -1,10 +1,14 @@
 # OpenCode 红绿灯
 
-一个常驻在 macOS 桌面上的交通灯悬浮窗，用「绿 / 黄 / 红」实时显示 [OpenCode](https://opencode.ai) 的工作状态——不用切回终端，余光一瞥就知道它是在干活、在等你确认，还是已经完成。
+一个常驻在桌面上的交通灯悬浮窗，用「绿 / 黄 / 红」实时显示 [OpenCode](https://opencode.ai) 的工作状态——不用切回终端，余光一瞥就知道它是在干活、在等你确认，还是已经完成。
 
-- 原生 Swift + AppKit，无第三方依赖，约 800 行
+支持 **macOS**（Swift + AppKit）与 **Windows 10/11**（C# + WinForms），两端同一套灯语与状态判定。
+
+- macOS：原生 Swift，无第三方依赖，约 800 行
+- Windows：单文件 exe（96 KB），用系统自带 .NET Framework 4.8，无需安装运行时
 - 只读 OpenCode 本地服务 API，不修改任何数据
-- 通用二进制（Apple Silicon / Intel），常驻内存 < 20 MB
+
+> Windows 版安装、构建与差异说明见 [Windows/README.md](Windows/README.md)。
 
 ## 灯语
 
@@ -106,12 +110,25 @@ opencode (终端)  ──启动──▶  watcher.sh  ──拉起──▶  Ope
 
 ```
 .
-├── Sources/main.swift   # 全部 App 源码（状态机 + 悬浮窗 + HTTP 客户端）
-├── Info.plist           # Bundle 配置（LSUIElement = true，无 Dock 图标）
-├── build.sh             # 编译 arm64 / x86_64 并 lipo 合并、ad-hoc 签名
-├── Install.command      # 安装到 ~/Applications + 注册 LaunchAgent
-├── Uninstall.command    # 卸载
-└── watcher.sh           # 守护脚本（每 2s 探测 OpenCode，控制悬浮窗生命周期）
+├── Sources/main.swift          # macOS：全部 App 源码（状态机 + 悬浮窗 + HTTP 客户端）
+├── Info.plist                  # macOS：Bundle 配置（LSUIElement = true，无 Dock 图标）
+├── build.sh                    # macOS：编译 arm64 / x86_64 并 lipo 合并、ad-hoc 签名
+├── Install.command             # macOS：安装到 ~/Applications + 注册 LaunchAgent
+├── Uninstall.command           # macOS：卸载
+├── watcher.sh                  # macOS：守护脚本（每 2s 探测 OpenCode，控制悬浮窗生命周期）
+└── Windows/
+    ├── Program.cs              # 入口、单实例、--selftest 参数
+    ├── Monitor.cs              # 状态判定（与 macOS 版逐条对应）
+    ├── Api.cs                  # 本地 REST 客户端（Basic Auth，带超时）
+    ├── ServiceConfig.cs        # service.json 多路径探测
+    ├── OpenCodeProcess.cs      # 进程守护（替代 watcher.sh）
+    ├── TrafficLightWindow.cs   # 分层窗口 + GDI+ 绘制 + 灯效动画 + 拖拽/菜单
+    ├── App.cs                  # 组合根：托盘、轮询、自检、位置记忆
+    ├── Json.cs                 # 极简 JSON 解析/序列化（无第三方依赖）
+    ├── Settings.cs             # %APPDATA% 配置读写
+    ├── build.sh                # 交叉编译脚本（macOS/Linux 也可）
+    ├── install.ps1             # 安装 + 登录自启
+    └── uninstall.ps1           # 卸载
 ```
 
 ## 卸载

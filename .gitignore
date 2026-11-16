@@ -1,7 +1,12 @@
 # 构建产物
 build/
+dist/
+bin/
+obj/
 *.app
 *.zip
+*.exe
+*.pdb
 
 # macOS
 .DS_Store
