@@ -28,15 +28,25 @@
 
 ## 安装
 
+### 方式一：下载预编译包
+
+到 [Releases](https://github.com/zhaoleixxx/OpenCodeTrafficLight/releases/latest) 下载 `OpenCodeTrafficLight-2.0.0-macos.zip`，解压后双击 `Install.command`。
+
+这是通用二进制（Apple Silicon + Intel），无需 Xcode。包内已附带 `watcher.sh`。
+
+首次打开若提示「无法打开，因为无法验证开发者」（未做 Apple 公证），右键点击 `Install.command` → 选择「打开」→ 再点「打开」。
+
+### 方式二：从源码构建
+
 需要 macOS 13+ 与 Xcode Command Line Tools（`xcode-select --install`）。
 
 ```bash
-git clone https://github.com/<your-name>/OpenCodeTrafficLight.git
+git clone https://github.com/zhaoleixxx/OpenCodeTrafficLight.git
 cd OpenCodeTrafficLight
 ./build.sh
 ```
 
-然后双击 `Install.command`。若提示「无法打开，因为无法验证开发者」，右键点击 → 选择「打开」→ 再点「打开」。
+然后双击 `Install.command`，同样的 Gatekeeper 提示处理方式。
 
 安装脚本会：
 
