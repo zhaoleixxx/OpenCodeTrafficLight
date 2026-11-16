@@ -349,7 +349,11 @@ final class TrafficLightView: NSView {
     // MARK: 图层
 
     private func lampRect(atTop index: Int) -> NSRect {
-        let housing = bounds.insetBy(dx: 5, dy: 5)
+        lampRect(atTop: index, in: bounds.size)
+    }
+
+    private func lampRect(atTop index: Int, in size: NSSize) -> NSRect {
+        let housing = NSRect(origin: .zero, size: size).insetBy(dx: 5, dy: 5)
         let total = kLampDiameter * 3 + kLampGap * 2
         let topPadding = (housing.height - total) / 2
         let y = housing.maxY - topPadding - kLampDiameter - CGFloat(index) * (kLampDiameter + kLampGap)
@@ -471,7 +475,11 @@ final class TrafficLightView: NSView {
     }
 
     private func drawHousing() {
-        let housing = bounds.insetBy(dx: 5, dy: 5)
+        drawHousing(in: bounds.size)
+    }
+
+    private func drawHousing(in size: NSSize) {
+        let housing = NSRect(origin: .zero, size: size).insetBy(dx: 5, dy: 5)
         let path = NSBezierPath(roundedRect: housing,
                                 xRadius: housing.width / 2,
                                 yRadius: housing.width / 2)
@@ -490,7 +498,7 @@ final class TrafficLightView: NSView {
         }
     }
 
-    private func drawLamp(in rect: NSRect, color base: NSColor, lit: Bool) {
+    private func drawLamp(in rect: NSRect, color base: NSColor, lit: Bool, opacity: CGFloat = 1) {
         if !lit {
             NSColor(srgbRed: 0.118, green: 0.125, blue: 0.133, alpha: 1).setFill()
             NSBezierPath(ovalIn: rect).fill()
@@ -501,14 +509,16 @@ final class TrafficLightView: NSView {
             return
         }
 
+        if opacity <= 0.01 { return }
+
         // 外发光
-        base.withAlphaComponent(0.20).setFill()
+        base.withAlphaComponent(0.20 * opacity).setFill()
         NSBezierPath(ovalIn: rect.insetBy(dx: -3, dy: -3)).fill()
 
         // 主体：径向渐变，中心偏上
-        let hot = base.blended(withFraction: 0.42, of: .white) ?? base
-        let mid = base
-        let edge = base.blended(withFraction: 0.30, of: .black) ?? base
+        let hot = (base.blended(withFraction: 0.42, of: .white) ?? base).withAlphaComponent(opacity)
+        let mid = base.withAlphaComponent(opacity)
+        let edge = (base.blended(withFraction: 0.30, of: .black) ?? base).withAlphaComponent(opacity)
         if let gradient = NSGradient(colors: [hot, mid, edge]) {
             gradient.draw(in: NSBezierPath(ovalIn: rect),
                           relativeCenterPosition: NSPoint(x: -0.12, y: 0.28))
@@ -517,14 +527,56 @@ final class TrafficLightView: NSView {
         // 高光（小而柔）
         let highlightRect = rect.insetBy(dx: rect.width * 0.34, dy: rect.height * 0.36)
             .offsetBy(dx: -rect.width * 0.02, dy: rect.height * 0.12)
-        NSColor(white: 1, alpha: 0.16).setFill()
+        NSColor(white: 1, alpha: 0.16 * opacity).setFill()
         NSBezierPath(ovalIn: highlightRect).fill()
 
         // 边缘压暗
-        base.blended(withFraction: 0.32, of: .black)?.withAlphaComponent(0.5).setStroke()
+        base.blended(withFraction: 0.32, of: .black)?.withAlphaComponent(0.5 * opacity).setStroke()
         let rim = NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5))
         rim.lineWidth = 1
         rim.stroke()
+    }
+
+    // MARK: 导出（说明书配图）
+
+    /// 把指定状态渲染成透明背景 PNG，供文档使用。
+    func pngData(for state: LightState, scale s: CGFloat = 3, opacity: CGFloat = 1) -> Data? {
+        let size = NSSize(width: kWindowWidth, height: kWindowHeight)
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil,
+                                         pixelsWide: Int(size.width * s),
+                                         pixelsHigh: Int(size.height * s),
+                                         bitsPerSample: 8,
+                                         samplesPerPixel: 4,
+                                         hasAlpha: true,
+                                         isPlanar: false,
+                                         colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0,
+                                         bitsPerPixel: 0) else { return nil }
+        rep.size = size
+
+        NSGraphicsContext.saveGraphicsState()
+        if let context = NSGraphicsContext(bitmapImageRep: rep) {
+            NSGraphicsContext.current = context
+            context.cgContext.setShouldAntialias(true)
+
+            drawHousing(in: size)
+
+            let litIndex: Int
+            switch state.mode {
+            case .red: litIndex = 0
+            case .yellow: litIndex = 1
+            case .green: litIndex = 2
+            }
+
+            for index in 0..<3 {
+                let rect = lampRect(atTop: index, in: size)
+                drawLamp(in: rect, color: lampColor(at: index), lit: index == litIndex,
+                         opacity: index == litIndex ? opacity : 1)
+            }
+        }
+        NSGraphicsContext.restoreGraphicsState()
+
+        return rep.representation(using: .png, properties: [:])
     }
 
     // MARK: 交互
@@ -594,6 +646,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AppActions {
         view = TrafficLightView(frame: NSRect(origin: .zero, size: size), actions: self)
         window.contentView = view
         window.orderFrontRegardless()
+
+        if let arg = CommandLine.arguments.first(where: { $0.hasPrefix("--export=") }) {
+            let directory = String(arg.dropFirst("--export=".count))
+            exportImages(to: directory)
+            NSApp.terminate(nil)
+            return
+        }
 
         if isSelfTest {
             startSelfTest()
@@ -667,6 +726,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, AppActions {
         let line = "\(Date().timeIntervalSince1970) \(state.headline) \(state.detail)\n"
         FileHandle.standardOutput.write(Data(line.utf8))
         view.apply(state)
+    }
+
+    // MARK: 导出
+
+    private func exportImages(to directory: String) {
+        try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
+
+        let states: [(String, LightState)] = [
+            ("green", LightState(mode: .green, blink: .none, headline: "全部完成", detail: "")),
+            ("yellow", LightState(mode: .yellow, blink: .none, headline: "任务进行中", detail: "")),
+            ("red", LightState(mode: .red, blink: .none, headline: "需要你处理", detail: "")),
+        ]
+
+        for (name, state) in states {
+            guard let data = view.pngData(for: state) else { continue }
+            let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name).png")
+            try? data.write(to: url)
+        }
+
+        // 闪烁状态导出亮/暗两帧：静态图无法表达周期，文档里并排说明
+        let blinking: [(String, LightState, CGFloat, CGFloat)] = [
+            ("greensoft", LightState(mode: .green, blink: .greenSoft, headline: "任务完成", detail: ""), 1.0, 0.52),
+            ("pulse", LightState(mode: .yellow, blink: .yellowPulse, headline: "等待你确认", detail: ""), 1.0, 0.34),
+            ("redfast", LightState(mode: .red, blink: .redFast, headline: "任务失败", detail: ""), 1.0, 0.18),
+        ]
+
+        for (name, state, bright, dim) in blinking {
+            if let data = view.pngData(for: state, opacity: bright) {
+                let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name)-bright.png")
+                try? data.write(to: url)
+            }
+            if let data = view.pngData(for: state, opacity: dim) {
+                let url = URL(fileURLWithPath: directory).appendingPathComponent("\(name)-dim.png")
+                try? data.write(to: url)
+            }
+        }
     }
 
     // MARK: 位置

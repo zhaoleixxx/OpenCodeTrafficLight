@@ -9,6 +9,8 @@
 - 只读 OpenCode 本地服务 API，不修改任何数据
 
 > Windows 版安装、构建与差异说明见 [Windows/README.md](Windows/README.md)。
+>
+> 详细功能说明、灯态截图与故障排查见 [使用说明书](docs/使用说明书.md)。
 
 ## 灯语
 
@@ -76,6 +78,9 @@ cd OpenCodeTrafficLight
 # 固定显示某一种
 ./build/OpenCodeTrafficLight --selftest --state=redfast
 # 可选值: yellow | pulse | red | redfast | greensoft | green
+
+# 导出六种灯态的透明 PNG（说明书配图用）
+./build/OpenCodeTrafficLight --export=docs/images
 ```
 
 ## 工作原理
